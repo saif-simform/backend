@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken")
 const CryptoJS = require("crypto-js")
 const moment = require('moment');
+const { CurrentUser } = require("./constant");
 require('dotenv').config();
 
 
@@ -31,11 +32,14 @@ const decryptUserID = async (value) => {
 };
 
 
-const generateToken = async (userId) => {
-    const secret = JWT_SECRET
+const generateToken = async (userId, refreshToken = false) => {
+    const key = refreshToken ? JWT_REFRESH_SECRET : JWT_SECRET
+    const expireTime = refreshToken ? JWT_REFRESH_EXPIRATION_DAYS : JWT_ACCESS_EXPIRATION_MINUTES
+    const expireUnit = refreshToken ? "days" : "minutes"
+
     const accessTokenExpires = moment().add(
-        JWT_ACCESS_EXPIRATION_MINUTES,
-        "minutes"
+        expireTime,
+        expireUnit
     );
 
     const payload = {
@@ -43,31 +47,18 @@ const generateToken = async (userId) => {
         iat: moment().unix(),
         exp: accessTokenExpires.unix(),
     };
-    return jwt.sign(payload, secret);
+    return jwt.sign(payload, key);
 };
 
-const generateRefreshToken = async (userId) => {
-    const secret = JWT_REFRESH_SECRET
-    const accessTokenExpires = moment().add(
-        JWT_REFRESH_EXPIRATION_DAYS,
-        "days"
-    );
-
-    const payload = {
-        sub: await encryptUserID(userId),
-        iat: moment().unix(),
-        exp: accessTokenExpires.unix(),
-    };
-    return jwt.sign(payload, secret);
-};
 
 const verifyToken = async (token, refreshToken = false) => {
     const key = refreshToken ? JWT_REFRESH_SECRET : JWT_SECRET
 
     const payload = jwt.verify(token, key);
     const userId = await decryptUserID(payload.sub);
+    const user_obj = CurrentUser.find(u => u.id == userId)
 
-    return userId;
+    return user_obj;
 };
 
-module.exports = { generateToken, generateRefreshToken, verifyToken }
+module.exports = { generateToken, verifyToken }
